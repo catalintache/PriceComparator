@@ -1,0 +1,140 @@
+PRICE COMPARATOR
+================
+
+A **Spring Boot 3 / Java 21** micro‑service that imports daily price & discount CSVs, stores them in a relational database and exposes a REST API for:
+
+* browsing the product catalog and current prices
+* inspecting price history (min / avg) and full timelines
+* fetching best‑value recommendations & current discounts
+* subscribing to e‑mail price alerts
+
+Goal: help consumers track price evolution and choose the best moment to buy.
+
+--------------------------------------------------------------------
+1  Requirements
+--------------------------------------------------------------------
+| Tool | Version |
+|------|---------|
+| Java | **21 LTS** |
+| Docker / Compose | 24 / v2 (optional) |
+| Gradle 8 + / Maven 3.9 + | if you build locally |
+| PostgreSQL 15 + | only if you *don’t* use Compose |
+
+--------------------------------------------------------------------
+2  Quick start (Docker Compose)
+--------------------------------------------------------------------
+```bash
+git clone https://github.com/<org>/price-comparator.git
+cd price-comparator
+docker compose build            # build image
+docker compose up               # app + db + MailHog
+```
+
+* API root   `http://localhost:8080/api`
+* Swagger UI   `http://localhost:8080/swagger-ui.html`
+* MailHog UI   `http://localhost:8025`
+
+Stop & clean:
+
+```bash
+Ctrl‑C
+docker compose down -v
+```
+
+--------------------------------------------------------------------
+3  Building from source
+--------------------------------------------------------------------
+```bash
+# Gradle
+./gradlew clean build
+
+# Maven
+mvn clean package
+```
+Runnable JAR in `build/libs/` (Gradle) or `target/` (Maven).  
+Override props via *application.yml*, env‑vars or `--spring.config.additional-location`.
+
+--------------------------------------------------------------------
+4  Project structure
+--------------------------------------------------------------------
+```
+├── .gitignore
+├── Dockerfile                  # container image
+├── docker-compose.yml          # app, db, mailhog
+├── build.gradle | pom.xml      # build tool + deps
+├── README.md                   # this file
+├── docs/
+│   ├── api-spec.yaml           # OpenAPI spec
+│   ├── architecture.md         # diagrams
+│   └── database-schema.sql     # relational schema
+└── src/
+    ├── main/
+    │   ├── java/eu/accesa/pricecomparator/…  # Spring code
+    │   └── resources/                       # YAML, logging, sample CSV
+    └── test/                                # unit + integration tests
+```
+
+--------------------------------------------------------------------
+5  API overview
+--------------------------------------------------------------------
+| Verb | Path | Purpose |
+|------|------|---------|
+| **POST** | `/api/prices/import?date=YYYY-MM-DD` | import price CSV |
+| **GET** | `/api/prices/history/min` | daily minimum (unit‑price) |
+| **GET** | `/api/prices/history/avg` | daily average (unit‑price) |
+| **GET** | `/api/analytics/prices/history` | full timeline (all points) |
+| **GET** | `/api/discounts/best?limit=10` | top % discounts |
+| **GET** | `/api/discounts/new?hours=24` | newly added discounts |
+| **POST** | `/api/alerts` | create price alert |
+| **POST** | `/api/alerts/check` | trigger alert scan manually |
+
+Full spec in **`docs/api-spec.yaml`** or live at `/v3/api-docs`.
+
+--------------------------------------------------------------------
+6  Scheduled jobs (defaults)
+--------------------------------------------------------------------
+| Job | CRON | Description |
+|-----|------|-------------|
+| `importPricesJob` | `0 0 2 * * ?` | import previous‑day price CSV |
+| `importDiscountsJob` | `0 30 2 * * ?` | import daily discounts CSV |
+| `checkAlertsJob` | `0 */15 * * * ?` | notify users when alert met |
+
+(Override via *application.yml*.)
+
+--------------------------------------------------------------------
+7  Demo in 30 seconds
+--------------------------------------------------------------------
+```bash
+# import two price files
+curl -X POST "http://localhost:8080/api/prices/import?date=2025-05-01"
+curl -X POST "http://localhost:8080/api/prices/import?date=2025-05-08"
+
+# aggregated trends
+curl "http://localhost:8080/api/prices/history/min?productId=P001&from=2025-05-01&to=2025-05-08"
+curl "http://localhost:8080/api/prices/history/avg?productId=P001&from=2025-05-01&to=2025-05-08"
+
+# full timeline
+curl "http://localhost:8080/api/analytics/prices/history?productId=P001&from=2025-05-01&to=2025-05-08"
+```
+
+--------------------------------------------------------------------
+8  Testing
+--------------------------------------------------------------------
+```bash
+./gradlew clean test jacocoTestReport    # or: mvn test
+```
+Fixtures in `src/test/resources/test-data/`.  
+Coverage HTML under `build/reports/jacoco/`.
+
+--------------------------------------------------------------------
+9  Contributing
+--------------------------------------------------------------------
+1. Fork → feature branch → PR  
+2. Use **conventional commits** (`feat:`, `fix:`, `chore:` …)  
+3. Add/extend unit tests & update OpenAPI spec  
+4. Ensure `./gradlew test` passes
+
+--------------------------------------------------------------------
+10  License
+--------------------------------------------------------------------
+Released under the **MIT License** – see `LICENSE`.
