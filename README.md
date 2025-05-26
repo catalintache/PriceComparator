@@ -58,20 +58,103 @@ Override props via *application.yml*, env‑vars or `--spring.config.additional-
 4  Project structure
 --------------------------------------------------------------------
 ```
+│
 ├── .gitignore
-├── Dockerfile                  # container image
-├── docker-compose.yml          # app, db, mailhog
-├── build.gradle | pom.xml      # build tool + deps
-├── README.md                   # this file
+├── Dockerfile                                      # Application containerization
+├── docker-compose.yml                              # Service definitions (DB, mail, etc.)
+├── build.gradle (or pom.xml)                       # Build tool + dependencies
+├── README.md                                       # Description, architecture, usage, endpoints
 ├── docs/
-│   ├── api-spec.yaml           # OpenAPI spec
-│   ├── architecture.md         # diagrams
-│   └── database-schema.sql     # relational schema
+│   ├── api-spec.yaml                               # OpenAPI / Swagger definition
+│   ├── architecture.md                             # Component diagram & flow explanations
+│   └── database-schema.sql                         # For relational DBs, if used
+│
 └── src/
     ├── main/
-    │   ├── java/eu/accesa/pricecomparator/…  # Spring code
-    │   └── resources/                       # YAML, logging, sample CSV
-    └── test/                                # unit + integration tests
+    │   ├── java/eu/accesa/pricecomparator/
+    │   │   ├── PriceComparatorApplication.java     # Spring Boot entry point
+    │   │   │
+    │   │   ├── config/                             # Cross-cutting configuration
+    │   │   │   ├── CsvConfig.java                  # CSV paths and formats
+    │   │   │   ├── SchedulingConfig.java           # Periodic jobs (import, alerts)
+    │   │   │   └── OpenApiConfig.java              # Springdoc / Swagger setup
+    │   │   │
+    │   │   ├── exception/                          # Global error handling
+    │   │   │   ├── ApiError.java                   # DTO for error responses
+    │   │   │   ├── GlobalExceptionHandler.java     # @ControllerAdvice class
+    │   │   │   ├── NotFoundException.java
+    │   │   │   └── ValidationException.java
+    │   │   │
+    │   │   ├── common/                             # Reusable utilities
+    │   │   │   └── util/
+    │   │   │       ├── CsvParser.java              # Generic parser using OpenCSV
+    │   │   │       ├── UnitConversionUtil.java     # kg↔g, l↔ml, pcs↔pcs
+    │   │   │       └── DateUtils.java              # e.g. "last 24h" calculation
+    │   │   │
+    │   │   ├── catalog/                            # Catalog & Pricing domain
+    │   │   │   ├── controller/
+    │   │   │   │   └── PriceController.java        # /api/prices, /api/prices/history
+    │   │   │   ├── service/
+    │   │   │   │   ├── PriceService.java           # CSV import + business logic
+    │   │   │   │   └── PriceHistoryService.java    # trends, history
+    │   │   │   ├── repository/
+    │   │   │   │   └── PriceRepository.java        # Spring Data JPA / JDBC Template
+    │   │   │   ├── model/
+    │   │   │   │   └── PriceRecord.java            # @Entity / internal DTO
+    │   │   │   └── dto/
+    │   │   │       └── PriceDto.java               # Exposed client schema
+    │   │   │
+    │   │   ├── discount/                           # Discounts domain
+    │   │   │   ├── controller/
+    │   │   │   │   └── DiscountController.java     # /api/discounts, /api/discounts/new
+    │   │   │   ├── service/
+    │   │   │   │   ├── DiscountService.java        # top-percent, new-since-24h logic
+    │   │   │   │   └── DiscountImportService.java  # Import discount CSVs
+    │   │   │   ├── repository/
+    │   │   │   │   └── DiscountRepository.java
+    │   │   │   ├── model/
+    │   │   │   │   └── Discount.java
+    │   │   │   └── dto/
+    │   │   │       └── DiscountDto.java
+    │   │   │
+    │   │   ├── analytics/                          # Recommendations & Reporting
+    │   │   │   ├── controller/
+    │   │   │   │   └── AnalyticsController.java    # /api/analytics/…
+    │   │   │   ├── service/
+    │   │   │   │   ├── TrendService.java           # Generates TrendPointDto[]
+    │   │   │   │   └── RecommendationService.java  # best-unit-price, substitutions
+    │   │   │   ├── dto/
+    │   │   │   │   ├── TrendPointDto.java          # { date, unitPrice }
+    │   │   │   │   └── RecommendationDto.java      # Product suggestions
+    │   │   │   └── util/
+    │   │   │       └── UnitPriceCalculator.java
+    │   │   │
+    │   │   └── alert/                              # Price alerts domain
+    │   │       ├── controller/
+    │   │       │   └── AlertController.java        # CRUD + manual alert check
+    │   │       ├── service/
+    │   │       │   └── AlertService.java           # Scheduling + checkAlerts()
+    │   │       ├── repository/
+    │   │       │   └── AlertRepository.java
+    │   │       ├── model/
+    │   │       │   └── PriceAlert.java             # targetPrice, userId, active
+    │   │       └── dto/
+    │   │           └── AlertRequestDto.java        # { productId, targetPrice, … }
+    │   │
+    │   └── resources/
+    │       ├── application.yml                     # CSV dirs, cron expressions, DB URL
+    │       ├── logback-spring.xml                  # Logging configuration
+    │       └── data/                               # Sample CSVs for manual testing
+    │
+    └── test/
+        ├── java/eu/accesa/pricecomparator/
+        │   ├── catalog/                            # PriceServiceTest, PriceControllerTest
+        │   ├── discount/                           # DiscountServiceTest
+        │   ├── analytics/                          # TrendServiceTest
+        │   ├── alert/                              # AlertServiceTest
+        │   └── common/                             # CsvParserTest, UnitConversionUtilTest
+        └── resources/
+            └── test-data/                          # Test CSVs for fixtures
 ```
 
 --------------------------------------------------------------------
